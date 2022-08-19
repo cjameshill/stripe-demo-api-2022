@@ -61,6 +61,7 @@ app.post("/create-payment-intent", async (req, res) => {
   const { customer } = req.body;
   const amount = calculateOrderAmount(items);
   const { connectAccountId = STRIPE_CONNECT_ACCOUNT } = req.body;
+  console.log("connected account: ", connectAccountId);
 
   // Create a PaymentIntent with the order amount and currency
   const paymentIntent = await stripe.paymentIntents.create({
