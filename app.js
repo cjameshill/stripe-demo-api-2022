@@ -85,7 +85,7 @@ app.post("/create-payment-intent", async (req, res) => {
 
 app.post("/charged-saved-payment-method", async (req, res) => {
   const { customer } = req.body;
-  const amount = calculateOrderAmount([]);
+  const { amount = 1000 } = req.body;
   const id = randomWords({ exactly: 2, join: '-' });
 
   // Create a PaymentIntent with the order amount and currency
@@ -107,8 +107,8 @@ app.post("/charged-saved-payment-method", async (req, res) => {
 
 app.post("/create-payment-intent-hold", async (req, res) => {
   const { items } = req.body;
+  const { amount = 1000 } = req.body;
   const { customer } = req.body;
-  const amount = calculateOrderAmount(items);
   const { connectAccountId = STRIPE_CONNECT_ACCOUNT } = req.body;
 
   // Create a PaymentIntent with the order amount and currency
@@ -131,7 +131,7 @@ app.post("/confirm-hold/:intent", async (req, res) => {
   try {
     const { intent } = req.params;
 
-    const amount = calculateOrderAmount([]);
+  const { amount = 1000 } = req.body;
     // Create a PaymentIntent with the order amount and currency
     const paymentIntent = await stripe.paymentIntents.capture(intent, {
       amount_to_capture: amount,
