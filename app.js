@@ -1,5 +1,6 @@
 const express = require("express");
 const cors = require("cors");
+const randomWords = require('random-words');
 const app = express();
 const PORT = process.env.PORT || 8080;
 const STRIPE_SECRET_KEY = process.env.STRIPE_SECRET_KEY;
@@ -65,7 +66,7 @@ app.post("/create-payment-intent", async (req, res) => {
 
   // Create a PaymentIntent with the order amount and currency
   const paymentIntent = await stripe.paymentIntents.create({
-    amount: calculateOrderAmount(items),
+    amount,
     currency: "gbp",
     automatic_payment_methods: {
       enabled: true,
@@ -80,6 +81,69 @@ app.post("/create-payment-intent", async (req, res) => {
   res.send({
     clientSecret: paymentIntent.client_secret,
   });
+});
+
+app.post("/charged-saved-payment-method", async (req, res) => {
+  const { customer } = req.body;
+  const amount = calculateOrderAmount([]);
+  const id = randomWords({ exactly: 2, join: '-' });
+
+  // Create a PaymentIntent with the order amount and currency
+  const paymentIntent = await stripe.paymentIntents.create({
+    amount,
+    currency: "gbp",
+    confirm: true,
+    customer,
+    off_session: true,
+    description: `Payment - ${id}`
+  });
+
+  res.send({
+    paymentName: id,
+    clientSecret: paymentIntent.client_secret,
+  });
+});
+
+
+app.post("/create-payment-intent-hold", async (req, res) => {
+  const { items } = req.body;
+  const { customer } = req.body;
+  const amount = calculateOrderAmount(items);
+  const { connectAccountId = STRIPE_CONNECT_ACCOUNT } = req.body;
+
+  // Create a PaymentIntent with the order amount and currency
+  const paymentIntent = await stripe.paymentIntents.create({
+    amount,
+    currency: "gbp",
+    payment_method_types: ["card"],
+    capture_method: "manual",
+    customer
+  });
+
+  res.send({
+    clientSecret: paymentIntent.client_secret,
+  });
+});
+
+
+app.post("/confirm-hold/:intent", async (req, res) => {
+  try {
+    const { intent } = req.params;
+
+    const amount = calculateOrderAmount([]);
+    // Create a PaymentIntent with the order amount and currency
+    const paymentIntent = await stripe.paymentIntents.capture(intent, {
+      amount_to_capture: amount,
+    })
+
+    res.send({
+      clientSecret: paymentIntent.client_secret,
+    });
+
+  } catch (error) {
+    console.log("error: ", error);
+    res.status(400).send({ error: error.message })
+  }
 });
 
 app.listen(PORT, () => console.log(`Node server listening on port ${PORT}!`));
