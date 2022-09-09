@@ -116,6 +116,7 @@ app.post("/create-payment-intent-hold", async (req, res) => {
     currency: "gbp",
     payment_method_types: ["card"],
     capture_method: "manual",
+    setup_future_usage: "off_session",
     customer
   });
 
