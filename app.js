@@ -1,12 +1,13 @@
 const express = require("express");
 const cors = require("cors");
-const randomWords = require('random-words');
+const randomWords = require("random-words");
 const app = express();
 const PORT = process.env.PORT || 8080;
 const STRIPE_SECRET_KEY = process.env.STRIPE_SECRET_KEY;
 const STRIPE_CONNECT_ACCOUNT = process.env.STRIPE_CONNECT_ACCOUNT;
 // This is your test secret API key.
 const stripe = require("stripe")(STRIPE_SECRET_KEY);
+const ConnectedAccountsRoutes = require("./routes/connectedAccounts");
 
 app.use(cors());
 app.use(express.static("public"));
@@ -85,7 +86,7 @@ app.post("/create-payment-intent", async (req, res) => {
 app.post("/charged-saved-payment-method", async (req, res) => {
   const { customer } = req.body;
   const { amount = 1000 } = req.body;
-  const id = randomWords({ exactly: 2, join: '-' });
+  const id = randomWords({ exactly: 2, join: "-" });
 
   // Create a PaymentIntent with the order amount and currency
   const paymentIntent = await stripe.paymentIntents.create({
@@ -94,7 +95,7 @@ app.post("/charged-saved-payment-method", async (req, res) => {
     confirm: true,
     customer,
     off_session: true,
-    description: `Payment - ${id}`
+    description: `Payment - ${id}`,
   });
 
   res.send({
@@ -102,7 +103,6 @@ app.post("/charged-saved-payment-method", async (req, res) => {
     clientSecret: paymentIntent.client_secret,
   });
 });
-
 
 app.post("/create-payment-intent-hold", async (req, res) => {
   const { items } = req.body;
@@ -117,7 +117,7 @@ app.post("/create-payment-intent-hold", async (req, res) => {
     payment_method_types: ["card"],
     capture_method: "manual",
     setup_future_usage: "off_session",
-    customer
+    customer,
   });
 
   res.send({
@@ -125,25 +125,25 @@ app.post("/create-payment-intent-hold", async (req, res) => {
   });
 });
 
-
 app.post("/confirm-hold/:intent", async (req, res) => {
   try {
     const { intent } = req.params;
 
-  const { amount = 1000 } = req.body;
+    const { amount = 1000 } = req.body;
     // Create a PaymentIntent with the order amount and currency
     const paymentIntent = await stripe.paymentIntents.capture(intent, {
       amount_to_capture: amount,
-    })
+    });
 
     res.send({
       clientSecret: paymentIntent.client_secret,
     });
-
   } catch (error) {
     console.log("error: ", error);
-    res.status(400).send({ error: error.message })
+    res.status(400).send({ error: error.message });
   }
 });
+
+app.use("/connect", ConnectedAccountsRoutes);
 
 app.listen(PORT, () => console.log(`Node server listening on port ${PORT}!`));
