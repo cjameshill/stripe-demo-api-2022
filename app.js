@@ -1,12 +1,16 @@
 const express = require("express");
 const cors = require("cors");
-const randomWords = require('random-words');
+const randomWords = require("random-words");
+const { config } = require("dotenv");
+config();
 const app = express();
+const { errorMiddleware } = require("./middleware/errorMiddleware");
 const PORT = process.env.PORT || 8080;
 const STRIPE_SECRET_KEY = process.env.STRIPE_SECRET_KEY;
 const STRIPE_CONNECT_ACCOUNT = process.env.STRIPE_CONNECT_ACCOUNT;
 // This is your test secret API key.
 const stripe = require("stripe")(STRIPE_SECRET_KEY);
+const ConnectedAccountsRoutes = require("./routes/connectedAccounts");
 
 app.use(cors());
 app.use(express.static("public"));
@@ -83,30 +87,46 @@ app.post("/create-payment-intent", async (req, res) => {
   });
 });
 
-app.post("/charged-saved-payment-method", async (req, res) => {
-  const { customer } = req.body;
-  const { amount = 1000 } = req.body;
-  const id = randomWords({ exactly: 2, join: '-' });
+app.post("/charged-saved-payment-method", async (req, res, next) => {
+  try {
+    const { customer } = req.body;
+    const { amount = 1000 } = req.body;
+    const id = randomWords({ exactly: 2, join: "-" });
+    const paymentMethods = await stripe.customers.listPaymentMethods(
+      customer,
+      { type: 'card' }
+    ).catch((e) => {
+      throw e;
+    });
+    console.log("payment methods: ", paymentMethods)
+    if (paymentMethods.data.length === 0) {
+      throw new Error("customer doesn't have any payment methods")
+    }
 
-  // Create a PaymentIntent with the order amount and currency
-  const paymentIntent = await stripe.paymentIntents.create({
-    amount,
-    currency: "gbp",
-    confirm: true,
-    customer,
-    off_session: true,
-    description: `Payment - ${id}`
-  });
+    // Create a PaymentIntent with the order amount and currency
+    const paymentIntent = await stripe.paymentIntents.create({
+      amount,
+      currency: "gbp",
+      confirm: true,
+      customer,
+      payment_method: paymentMethods.data[0].id,
+      off_session: true,
+      description: `Payment - ${id}`,
+    }).catch((e) => {
+      throw e;
+    });
 
-  res.send({
-    paymentName: id,
-    clientSecret: paymentIntent.client_secret,
-  });
+    res.send({
+      paymentName: id,
+      clientSecret: paymentIntent.client_secret,
+    });
+  } catch (error) {
+    next(error)
+  }
+
 });
 
-
 app.post("/create-payment-intent-hold", async (req, res) => {
-  const { items } = req.body;
   const { amount = 1000 } = req.body;
   const { customer } = req.body;
   const { connectAccountId = STRIPE_CONNECT_ACCOUNT } = req.body;
@@ -118,7 +138,7 @@ app.post("/create-payment-intent-hold", async (req, res) => {
     payment_method_types: ["card"],
     capture_method: "manual",
     setup_future_usage: "off_session",
-    customer
+    customer,
   });
 
   res.send({
@@ -126,25 +146,27 @@ app.post("/create-payment-intent-hold", async (req, res) => {
   });
 });
 
-
 app.post("/confirm-hold/:intent", async (req, res) => {
   try {
     const { intent } = req.params;
 
-  const { amount = 1000 } = req.body;
+    const { amount = 1000 } = req.body;
     // Create a PaymentIntent with the order amount and currency
     const paymentIntent = await stripe.paymentIntents.capture(intent, {
       amount_to_capture: amount,
-    })
+    });
 
     res.send({
       clientSecret: paymentIntent.client_secret,
     });
-
   } catch (error) {
     console.log("error: ", error);
-    res.status(400).send({ error: error.message })
+    res.status(400).send({ error: error.message });
   }
 });
+
+app.use("/connect", ConnectedAccountsRoutes);
+app.use(errorMiddleware);
+
 
 app.listen(PORT, () => console.log(`Node server listening on port ${PORT}!`));
