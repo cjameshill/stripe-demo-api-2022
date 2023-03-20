@@ -66,12 +66,12 @@ app.post("/create-payment-intent", async (req, res) => {
   const { customer } = req.body;
   const amount = calculateOrderAmount(items);
   const { connectAccountId = STRIPE_CONNECT_ACCOUNT } = req.body;
-  console.log("connected account: ", connectAccountId);
+  const { currency = "eur" } = req.body;
 
   // Create a PaymentIntent with the order amount and currency
   const paymentIntent = await stripe.paymentIntents.create({
     amount,
-    currency: "gbp",
+    currency,
     automatic_payment_methods: {
       enabled: true,
     },
@@ -86,44 +86,66 @@ app.post("/create-payment-intent", async (req, res) => {
     clientSecret: paymentIntent.client_secret,
   });
 });
+app.post("/create-payment-intent-on-behalf-of", async (req, res) => {
+  const { items } = req.body;
+  const { customer } = req.body;
+  const amount = calculateOrderAmount(items);
+  const { connectAccountId = STRIPE_CONNECT_ACCOUNT } = req.body;
+  const { currency = "eur" } = req.body;
+
+  // Create a PaymentIntent with the order amount and currency
+  const paymentIntent = await stripe.paymentIntents.create({
+    amount,
+    currency,
+    automatic_payment_methods: {
+      enabled: true,
+    },
+    on_behalf_of: connectAccountId,
+    customer,
+  });
+
+  res.send({
+    clientSecret: paymentIntent.client_secret,
+  });
+});
 
 app.post("/charged-saved-payment-method", async (req, res, next) => {
   try {
     const { customer } = req.body;
     const { amount = 1000 } = req.body;
     const id = randomWords({ exactly: 2, join: "-" });
-    const paymentMethods = await stripe.customers.listPaymentMethods(
-      customer,
-      { type: 'card' }
-    ).catch((e) => {
-      throw e;
-    });
-    console.log("payment methods: ", paymentMethods)
+    const paymentMethods = await stripe.customers
+      .listPaymentMethods(customer, { type: "card" })
+      .catch((e) => {
+        throw e;
+      });
+    console.log("payment methods: ", paymentMethods);
     if (paymentMethods.data.length === 0) {
-      throw new Error("customer doesn't have any payment methods")
+      throw new Error("customer doesn't have any payment methods");
     }
 
     // Create a PaymentIntent with the order amount and currency
-    const paymentIntent = await stripe.paymentIntents.create({
-      amount,
-      currency: "gbp",
-      confirm: true,
-      customer,
-      payment_method: paymentMethods.data[0].id,
-      off_session: true,
-      description: `Payment - ${id}`,
-    }).catch((e) => {
-      throw e;
-    });
+    const paymentIntent = await stripe.paymentIntents
+      .create({
+        amount,
+        currency: "gbp",
+        confirm: true,
+        customer,
+        payment_method: paymentMethods.data[0].id,
+        off_session: true,
+        description: `Payment - ${id}`,
+      })
+      .catch((e) => {
+        throw e;
+      });
 
     res.send({
       paymentName: id,
       clientSecret: paymentIntent.client_secret,
     });
   } catch (error) {
-    next(error)
+    next(error);
   }
-
 });
 
 app.post("/create-payment-intent-hold", async (req, res) => {
@@ -167,6 +189,5 @@ app.post("/confirm-hold/:intent", async (req, res) => {
 
 app.use("/connect", ConnectedAccountsRoutes);
 app.use(errorMiddleware);
-
 
 app.listen(PORT, () => console.log(`Node server listening on port ${PORT}!`));
