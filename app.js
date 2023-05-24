@@ -86,6 +86,7 @@ app.post("/create-payment-intent", async (req, res) => {
       email,
     },
   });
+  console.log("payment intent: ", paymentIntent);
 
   res.send({
     clientSecret: paymentIntent.client_secret,
