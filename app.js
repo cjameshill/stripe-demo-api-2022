@@ -89,6 +89,7 @@ app.post("/create-payment-intent", async (req, res) => {
 
   res.send({
     clientSecret: paymentIntent.client_secret,
+    paymentIntent,
   });
 });
 app.post("/create-payment-intent-on-behalf-of", async (req, res) => {
