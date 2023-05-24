@@ -63,7 +63,7 @@ app.post("/create-subscription", async (req, res) => {
 
 app.post("/create-payment-intent", async (req, res) => {
   const { items } = req.body;
-  const { customer } = req.body;
+  const { customer, email = "", name = "" } = req.body;
   const amount = calculateOrderAmount(items);
   const { connectAccountId = STRIPE_CONNECT_ACCOUNT } = req.body;
   const { currency = "eur" } = req.body;
@@ -80,6 +80,11 @@ app.post("/create-payment-intent", async (req, res) => {
       destination: connectAccountId,
     },
     customer,
+    description: `${name} - ${email}`,
+    metadata: {
+      name,
+      email,
+    },
   });
 
   res.send({
@@ -88,7 +93,7 @@ app.post("/create-payment-intent", async (req, res) => {
 });
 app.post("/create-payment-intent-on-behalf-of", async (req, res) => {
   const { items } = req.body;
-  const { customer } = req.body;
+  const { customer, email = "", name = "" } = req.body;
   const amount = calculateOrderAmount(items);
   const { connectAccountId = STRIPE_CONNECT_ACCOUNT } = req.body;
   const { currency = "eur" } = req.body;
@@ -102,6 +107,11 @@ app.post("/create-payment-intent-on-behalf-of", async (req, res) => {
     },
     on_behalf_of: connectAccountId,
     customer,
+    description: `${name} - ${email}`,
+    metadata: {
+      name,
+      email,
+    },
   });
 
   res.send({
